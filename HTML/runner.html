@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Infinity Runner Aprimorado</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      overflow: hidden;
+      background: #222;
+      font-family: sans-serif;
+      color: #fff;
+    }
+
+    #game {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #player,
+    .obstacle {
+      position: absolute;
+      bottom: 0;
+      width: 60px;
+      height: 60px;
+      background-size: cover;
+    }
+
+    #player {
+      background-image: url('player.png');
+    }
+
+    .obstacle {
+      background-image: url('ferramenta_bonus.png');
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+    }
+
+    /* Tela de Game Over */
+    #gameOverScreen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: #fff;
+      font-size: 24px;
+      z-index: 10;
+    }
+
+    #gameOverScreen h1 {
+      margin-bottom: 20px;
+    }
+
+    #gameOverScreen button {
+      padding: 10px 20px;
+      font-size: 18px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background: #28a745;
+      color: #fff;
+    }
+
+    #gameOverScreen button:hover {
+      background: #218838;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="player"></div>
+    <div id="score">Pontuação: 0</div>
+    <div id="gameOverScreen">
+      <h1>Game Over!</h1>
+      <p>Sua pontuação: <span id="finalScore">0</span></p>
+      <button id="restartBtn">Reiniciar</button>
+    </div>
+  </div>
+
+  <script>
+    // Elementos do DOM
+    const game        = document.getElementById('game');
+    const playerEl    = document.getElementById('player');
+    const scoreEl     = document.getElementById('score');
+    const gameOverEl  = document.getElementById('gameOverScreen');
+    const finalScore  = document.getElementById('finalScore');
+    const restartBtn  = document.getElementById('restartBtn');
+
+    // Áudios
+    const jumpSound   = new Audio('jump.wav');
+    const hitSound    = new Audio('hit.wav');
+    jumpSound.volume = 0.2;
+    hitSound.volume  = 0.2;
+
+    // Estado do jogador
+    let playerX       = 100;
+    let playerY       = 0;
+    let vy            = 0;
+    let isJumping     = false;
+    const playerSpeed  = 300;  // px/s
+    const jumpVelocity = 450;  // px/s
+    const gravity      = 1200; // px/s²
+
+    // Estado do jogo
+    let obstacles      = [];
+    let spawnTimer     = 0;
+    let spawnInterval  = 1.5;   // segundos
+    let gameTime       = 0;
+    let obstacleSpeed  = 250;   // px/s inicial
+    const accelRate    = 30;    // aumento de velocidade por segundo
+    let score          = 0;
+    let isGameOver     = false;
+
+    // Controles
+    const keys = { ArrowLeft: false, ArrowRight: false, Space: false };
+    document.addEventListener('keydown', e => {
+      if (keys[e.code] !== undefined) {
+        keys[e.code] = true;
+        if (e.code === 'Space' && !isJumping && !isGameOver) {
+          isJumping = true;
+          vy = jumpVelocity;
+          jumpSound.currentTime = 0;
+          jumpSound.play();
+        }
+      }
+    });
+    document.addEventListener('keyup', e => {
+      if (keys[e.code] !== undefined) keys[e.code] = false;
+    });
+
+    // Criar obstáculo
+    function spawnObstacle() {
+      const obsEl = document.createElement('div');
+      obsEl.classList.add('obstacle');
+      game.appendChild(obsEl);
+      obstacles.push({ el: obsEl, x: window.innerWidth });
+    }
+
+    // Função para finalizar o jogo
+    function gameOver() {
+      isGameOver = true;
+      hitSound.currentTime = 0;
+      hitSound.play();
+      finalScore.textContent = Math.floor(score);
+      gameOverEl.style.display = 'flex';
+    }
+
+    // Reiniciar via botão
+    restartBtn.addEventListener('click', () => {
+      location.reload();
+    });
+
+    // Loop principal
+    let lastTime = performance.now();
+    function gameLoop(now) {
+      if (isGameOver) return;
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+
+      // Atualiza tempo e pontuação
+      gameTime   += dt;
+      score      += dt * 10;
+      scoreEl.textContent = 'Pontuação: ' + Math.floor(score);
+
+      // Aumenta velocidade dos obstáculos
+      obstacleSpeed = 250 + accelRate * gameTime;
+
+      // Controle de spawn aleatório
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnObstacle();
+        spawnTimer = spawnInterval + Math.random() * 1.2;
+      }
+
+      // Movimento do jogador
+      if (keys.ArrowLeft)  playerX -= playerSpeed * dt;
+      if (keys.ArrowRight) playerX += playerSpeed * dt;
+      playerX = Math.max(0, Math.min(playerX, window.innerWidth - 60));
+
+      // Física de pulo
+      vy       -= gravity * dt;
+      playerY   = Math.max(0, playerY + vy * dt);
+      if (playerY === 0) isJumping = false;
+
+      playerEl.style.left   = playerX + 'px';
+      playerEl.style.bottom = playerY + 'px';
+
+      // Atualiza obstáculos e detecta colisão
+      obstacles = obstacles.filter(o => {
+        o.x -= obstacleSpeed * dt;
+        o.el.style.left = o.x + 'px';
+
+        const hitX = o.x < playerX + 60 && o.x + 60 > playerX;
+        const hitY = playerY < 60;
+        if (hitX && hitY) {
+          gameOver();
+          return false;
+        }
+
+        if (o.x < -60) {
+          o.el.remove();
+          return false;
+        }
+        return true;
+      });
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    requestAnimationFrame(gameLoop);
+
+  </script>
+</body>
+</html>
