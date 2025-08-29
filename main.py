@@ -52,7 +52,7 @@ velocidade_fundo = 2
 # -------------------------
 # Cores e FPS
 # -------------------------
-vermelho = (255, 255, 0)
+vermelho = (255, 0, 0)
 preto = (0, 0, 0)
 cinza = (200, 200, 200)
 clock = pygame.time.Clock()
