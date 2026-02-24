@@ -9,7 +9,7 @@ class Bonus(pygame.sprite.Sprite):
         self.y = random.randint(altura_tela - 300, altura_tela - 150)
 
         self.tipo = random.choices(
-            ["ferramenta_bonus.png", "bebe_bonus.png", "ppr_bonus.png"],
+            ["images/ferramenta_bonus.png", "images/bebe_bonus.png", "images/ppr_bonus.png"],
             weights=[5, 3, 1],  # Menos chances do PPR
             k=1
         )[0]

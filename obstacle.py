@@ -21,10 +21,10 @@ class Obstacle(pygame.sprite.Sprite):
     def carregar_imagem(self, tipo):
         """Seleciona a imagem do obstáculo com base no tipo."""
         caminhos = {
-            1: "Vazamento1.png",
-            2: "Vazamento2.png",
-            3: "Bebedouro.png",
-            4: "Ar_Condicionado.png"
+            1: "images/Vazamento1.png",
+            2: "images/Vazamento2.png",
+            3: "images/Bebedouro.png",
+            4: "images/Ar_Condicionado.png"
         }
         caminho = caminhos.get(tipo)
         try:

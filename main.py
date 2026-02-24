@@ -29,11 +29,11 @@ pygame.display.set_caption("Jogo da Goiabinha")
 # -------------------------
 # Sons
 # -------------------------
-som_botao = pygame.mixer.Sound(os.path.join(os.getcwd(), "botao_inicial.wav"))
-som_morte = pygame.mixer.Sound(os.path.join(os.getcwd(), "som_morte.wav"))
+som_botao = pygame.mixer.Sound(os.path.join(os.getcwd(), "sounds/botao_inicial.wav"))
+som_morte = pygame.mixer.Sound(os.path.join(os.getcwd(), "sounds/Sad Violin.mp3"))
 
 # Música de fundo
-pygame.mixer.music.load(os.path.join(os.getcwd(), "musica.mp3"))
+pygame.mixer.music.load(os.path.join(os.getcwd(), "sounds/musica.mp3"))
 volume_atual = 0.5
 pygame.mixer.music.set_volume(volume_atual)
 pygame.mixer.music.play(-1)
@@ -41,9 +41,9 @@ pygame.mixer.music.play(-1)
 # -------------------------
 # Imagens de fundo
 # -------------------------
-fundo_jogo = pygame.image.load("Background.jpg").convert()
+fundo_jogo = pygame.image.load("images/Background.jpg").convert()
 fundo_jogo = pygame.transform.scale(fundo_jogo, (largura_tela, altura_tela))
-fundo_inicial = pygame.image.load("Background_TelaInicial.png").convert()
+fundo_inicial = pygame.image.load("images/Background_TelaInicial.png").convert()
 fundo_inicial = pygame.transform.scale(fundo_inicial, (largura_tela, altura_tela))
 
 x_fundo = 0
@@ -108,7 +108,7 @@ while rodando:
         if desenhar_botao(tela, "Iniciar Jogo", largura_tela//2 - 100, 400, 200, 50, cinza, preto, eventos):
             estado_jogo = JOGANDO
             player = Player(tela, largura_tela, altura_tela)
-            escudo_img = pygame.image.load("shield_force.png").convert_alpha()
+            escudo_img = pygame.image.load("images/shield_force.png").convert_alpha()
             escudo_img = pygame.transform.scale(
                 escudo_img,
                 (player.image.get_width() + 50, player.image.get_height() + 50)
@@ -223,15 +223,15 @@ while rodando:
             b.mover()
             b.desenhar()
             if player.rect.colliderect(b.rect):
-                if b.tipo == "ferramenta_bonus.png":
+                if b.tipo == "images/ferramenta_bonus.png":
                     imune = True
                     tempo_imunidade = pygame.time.get_ticks()
-                elif b.tipo == "bebe_bonus.png":
-                    pontuacao -= 100
+                elif b.tipo == "images/bebe_bonus.png":
+                    pontuacao -= 10
                     mensagem_famoso = True
                     tempo_mensagem = pygame.time.get_ticks()
-                elif b.tipo == "ppr_bonus.png":
-                    pontuacao += 500
+                elif b.tipo == "images/ppr_bonus.png":
+                    pontuacao += 50
                 bonus.remove(b)
 
         if imune and pygame.time.get_ticks() - tempo_imunidade > 5000:
@@ -266,7 +266,7 @@ while rodando:
         tela.blit(player_img, player.rect.topleft)
 
         fonte_game_over = pygame.font.Font(None, 108)  # 72 é o tamanho da fonte
-        game_over_texto = fonte_game_over.render("SE FODEU", True, vermelho)
+        game_over_texto = fonte_game_over.render("Morreu!", True, vermelho)
         tela.blit(game_over_texto, (largura_tela//2 - game_over_texto.get_width()//2, 200))
 
         # Botão Reiniciar

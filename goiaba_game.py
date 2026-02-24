@@ -15,7 +15,7 @@ preto = (0, 0, 0)
 clock = pygame.time.Clock()
 
 # Carregamento da folha de sprites do player
-sprite_sheet = pygame.image.load("sprite_sheet-.png")  # Certifique-se de ter essa imagem
+sprite_sheet = pygame.image.load("images/sprite_sheet-.png")  # Certifique-se de ter essa imagem
 
 # Classe do jogador
 class Player(pygame.sprite.Sprite):
@@ -78,11 +78,11 @@ class Bonus(pygame.sprite.Sprite):
         self.x = largura_tela
         self.y = random.randint(altura_tela - 200, altura_tela - 150)
         if tipo == 1:
-            self.imagem = pygame.image.load("ferramenta_bonus.png")
+            self.imagem = pygame.image.load("images/ferramenta_bonus.png")
         elif tipo == 2:
-            self.imagem = pygame.image.load("bebe_bonus.png")
+            self.imagem = pygame.image.load("images/bebe_bonus.png")
         else:
-            self.imagem = pygame.image.load("ppr_bonus.png")
+            self.imagem = pygame.image.load("images/ppr_bonus.png")
         self.imagem = pygame.transform.scale(self.imagem, (50, 50))
         self.rect = self.imagem.get_rect(topleft=(self.x, self.y))
 

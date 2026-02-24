@@ -8,7 +8,7 @@ class Player(pygame.sprite.Sprite):
         self.altura_tela = altura_tela
 
         # Carregando sprite sheet e ajustando quadros de animação
-        self.sprite_sheet = pygame.image.load("sprite_sheet-.png")
+        self.sprite_sheet = pygame.image.load("images/sprite_sheet-.png")
         self.frames = self.carregar_frames(largura_frame=70, altura_frame=70)
         
         # Inicialização do personagem
