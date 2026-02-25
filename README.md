@@ -101,9 +101,13 @@ python main.py
 
 ## 👨‍💻 Autor
 
-Desenvolvido por Vinicius Lago
+Desenvolvido por Vinicius M. Lago
 
 GitHub:
 https://github.com/ViniciusMLago
+
+Design artístico e musical
+
+Matheus Lima do Nascimento
 ---
 #### ⭐ Se você gostou do projeto, deixe uma estrela no repositório!
