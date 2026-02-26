@@ -3,7 +3,7 @@ import random
 import os
 from player import Player
 from bonus import Bonus
-from utils import exibir_pontuacao, desenhar_botao
+from utils import exibir_pontuacao, desenhar_botao, alterar_som
 from obstacle import Obstacle
 
 # -------------------------
@@ -34,7 +34,7 @@ som_morte = pygame.mixer.Sound(os.path.join(os.getcwd(), "sounds/Sad Violin.mp3"
 
 # Música de fundo
 pygame.mixer.music.load(os.path.join(os.getcwd(), "sounds/musica.mp3"))
-volume_atual = 0.5
+volume_atual = float(0.5)
 pygame.mixer.music.set_volume(volume_atual)
 pygame.mixer.music.play(-1)
 
@@ -93,7 +93,7 @@ while rodando:
             rodando = False
 
     mouse = pygame.mouse.get_pos()
-
+    print("volumedo mouse: ",volume_atual)
     # -------------------------
     # TELA INICIAL
     # -------------------------
@@ -133,36 +133,7 @@ while rodando:
     # CONFIGURAÇÃO (POP-UP)
     # -------------------------
     elif estado_jogo == CONFIG:
-        tela.blit(fundo_inicial, (0, 0))
-        pygame.draw.rect(tela, (200, 200, 200), (200, 150, 400, 300))
-        pygame.draw.rect(tela, (0, 0, 0), (200, 150, 400, 300), 3)
-
-        texto = fonte.render("Ajuste a altura da música", True, (0, 0, 0))
-        tela.blit(texto, (largura_tela//2 - texto.get_width()//2, 170))
-
-        volume_pos_x = 250
-        volume_pos_y = 250
-        volume_largura = 300
-        volume_altura = 20
-        pygame.draw.rect(tela, (150, 150, 150), (volume_pos_x, volume_pos_y, volume_largura, volume_altura))
-        barra_largura = volume_atual * volume_largura
-        pygame.draw.rect(tela, (0, 200, 0), (volume_pos_x, volume_pos_y, barra_largura, volume_altura))
-
-        if pygame.mouse.get_pressed()[0]:
-            mouse_x = pygame.mouse.get_pos()[0]
-            if volume_pos_x <= mouse_x <= volume_pos_x + volume_largura:
-                volume_atual = (mouse_x - volume_pos_x) / volume_largura
-                pygame.mixer.music.set_volume(volume_atual)
-
-        # Botão Voltar
-        hover_voltar = (largura_tela//2 - 50 < mouse[0] < largura_tela//2 + 50) and (400 < mouse[1] < 450)
-        if hover_voltar and not getattr(desenhar_botao, "ja_hover_voltar", False):
-            som_botao.play()
-        desenhar_botao.ja_hover_voltar = hover_voltar
-        if desenhar_botao(tela, "Voltar", largura_tela//2 - 50, 400, 100, 50, cinza, preto, eventos):
-            estado_jogo = TELA_INICIAL
-            pygame.mixer.music.play(-1)
-            pygame.mixer.music.set_volume(volume_atual)
+        volume_atual, estado_jogo = alterar_som(tela, fundo_inicial, fonte, largura_tela, mouse, som_botao, cinza, preto, eventos, estado_jogo, TELA_INICIAL, volume_atual)
 
     # -------------------------
     # JOGO
