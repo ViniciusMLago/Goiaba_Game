@@ -3,7 +3,7 @@ import random
 import os
 from player import Player
 from bonus import Bonus
-from utils import exibir_pontuacao, desenhar_botao, alterar_som
+from utils import adicionar_tempo_escudo, desenhar_barra_escudo, escudo_ativo, exibir_pontuacao, desenhar_botao, alterar_som
 from obstacle import Obstacle
 
 # -------------------------
@@ -69,10 +69,17 @@ velocidade_obstaculo = 6
 ultimo_tempo_obstaculo = 0
 intervalo_minimo = 1000
 imune = False
-tempo_imunidade = 0
+ppr = False
+chamado = False
+tempo_escudo = 0
+tempo_fim_escudo = 0
+duracao_escudo = 5000
 mensagem_famoso = False
 tempo_mensagem = 0
 som_morte_tocado = False
+
+tempo_fim_escudo = 0
+duracao_bonus = 5000  # 5 segundos por ferramenta
 
 fonte = pygame.font.Font(None, 36)
 
@@ -93,7 +100,7 @@ while rodando:
             rodando = False
 
     mouse = pygame.mouse.get_pos()
-    print("volumedo mouse: ",volume_atual)
+
     # -------------------------
     # TELA INICIAL
     # -------------------------
@@ -144,6 +151,13 @@ while rodando:
         if rel_x < largura_tela:
             tela.blit(fundo_jogo, (rel_x, 0))
         x_fundo -= velocidade_fundo
+        velocidade_fundo += 0.001
+        print(f"Velocidade do fundo: {velocidade_fundo:.2f}")
+
+        overlay = pygame.Surface((largura_tela, altura_tela))
+        overlay.fill((50, 50, 50))
+        overlay.set_alpha(60)
+        tela.blit(overlay, (0, 0))
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
@@ -162,17 +176,24 @@ while rodando:
         player.atualizar()
         player.desenhar()
 
+        desenhar_barra_escudo(
+            tela,
+            tempo_fim_escudo,
+            duracao_bonus,
+            fonte
+        )
+
         if imune:
             shield_rect = escudo_img.get_rect(center=player.rect.center)
             tela.blit(escudo_img, shield_rect)
 
         # Obstáculos
         tempo_atual = pygame.time.get_ticks()
-        if tempo_atual - ultimo_tempo_obstaculo > intervalo_minimo and random.randint(1, 50) == 1:
+        if tempo_atual - ultimo_tempo_obstaculo > intervalo_minimo and random.randint(1, 100) == 1:
             tipo_obstaculo = random.randint(1, 4)
             obstaculos.add(Obstacle(tela, largura_tela, altura_tela, tipo_obstaculo, velocidade_obstaculo))
             ultimo_tempo_obstaculo = tempo_atual
-            velocidade_obstaculo += 0.1
+            velocidade_obstaculo += 0.05  # Aumenta a velocidade dos obstáculos a cada geração
 
         for obstaculo in list(obstaculos):
             obstaculo.mover()
@@ -196,23 +217,26 @@ while rodando:
             if player.rect.colliderect(b.rect):
                 if b.tipo == "images/ferramenta_bonus.png":
                     imune = True
-                    tempo_imunidade = pygame.time.get_ticks()
+                    chamado = True
+                    tempo_fim_escudo = adicionar_tempo_escudo(tempo_fim_escudo,duracao_bonus)    
+                    
                 elif b.tipo == "images/bebe_bonus.png":
-                    pontuacao -= 10
+                    pontuacao += 10
                     mensagem_famoso = True
                     tempo_mensagem = pygame.time.get_ticks()
                 elif b.tipo == "images/ppr_bonus.png":
                     pontuacao += 50
-                bonus.remove(b)
+                    ppr = True
+                bonus.remove(b)  
 
-        if imune and pygame.time.get_ticks() - tempo_imunidade > 5000:
-            imune = False
+        if not escudo_ativo(tempo_fim_escudo):        
+                imune = False
 
         if mensagem_famoso:
-            mensagem = fonte.render("Você ficou famoso no Instagram!", True, (255, 0, 0))
+            mensagem = fonte.render("Você ficou famoso no Instagram!", True, (255, 255, 255))
             tela.blit(mensagem, (largura_tela//2 - mensagem.get_width()//2, 200))
             if pygame.time.get_ticks() - tempo_mensagem > 2000:
-                mensagem_famoso = False
+                mensagem_famoso = False              
 
         pontuacao += 1 / 60
         exibir_pontuacao(tela, int(pontuacao))
@@ -222,22 +246,28 @@ while rodando:
     # -------------------------
     elif estado_jogo == GAME_OVER:
         # Fundo PB
-        fundo_cinza = pygame.Surface((largura_tela, altura_tela))
-        fundo_cinza.blit(fundo_jogo, (0, 0))
-        arr = pygame.surfarray.array3d(fundo_cinza)
-        cinza_arr = arr.mean(axis=2, keepdims=True).repeat(3, axis=2)
-        pygame.surfarray.blit_array(fundo_cinza, cinza_arr)
+        fundo_cinza = fundo_jogo.copy()
+        overlay = pygame.Surface((largura_tela, altura_tela))
+        overlay.fill((100, 100, 100))  # tom de cinza
+        overlay.set_alpha(150)  # intensidade do efeito
+
+        fundo_cinza.blit(overlay, (0, 0))
         tela.blit(fundo_cinza, (0, 0))
 
         # Player PB
         player_img = player.image.copy()
-        arr_player = pygame.surfarray.array3d(player_img)
-        cinza_player = arr_player.mean(axis=2, keepdims=True).repeat(3, axis=2)
-        pygame.surfarray.blit_array(player_img, cinza_player)
+
+        # Criar superfície cinza
+        cinza_overlay = pygame.Surface(player_img.get_size())
+        cinza_overlay.fill((180, 180, 180))  # intensidade do cinza
+
+        # Aplicar efeito multiplicação
+        player_img.blit(cinza_overlay, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
+        player_img.set_alpha(180)  # intensidade do efeito
         tela.blit(player_img, player.rect.topleft)
 
         fonte_game_over = pygame.font.Font(None, 108)  # 72 é o tamanho da fonte
-        game_over_texto = fonte_game_over.render("Morreu!", True, vermelho)
+        game_over_texto = fonte_game_over.render("Goiabinha faleceu!", True, vermelho)
         tela.blit(game_over_texto, (largura_tela//2 - game_over_texto.get_width()//2, 200))
 
         # Botão Reiniciar

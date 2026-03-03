@@ -51,7 +51,7 @@ class Player(pygame.sprite.Sprite):
     def atualizar(self):
         # Atualiza posição vertical (gravidade)
         self.rect.y += self.velocidade_y
-        self.velocidade_y += 1
+        self.velocidade_y += 0.8  # Gravidade
 
         # Verifica se tocou o chão
         if self.rect.y >= self.altura_tela - 70 - 30:

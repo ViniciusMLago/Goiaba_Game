@@ -6,9 +6,63 @@ tempo_mensagem = 0
 
 def exibir_pontuacao(tela, pontuacao):
     fonte = pygame.font.Font(None, 36)
-    preto = (0, 0, 0)
-    texto = fonte.render(f"Score: {pontuacao}", True, preto)
-    tela.blit(texto, (10, 10))
+    cor_texto = (255, 255, 255)
+    texto = fonte.render(f"Score: {pontuacao}", True, cor_texto)
+    tela.blit(texto, (20, 20))
+
+def adicionar_tempo_escudo(tempo_fim_escudo, duracao_bonus):
+    """
+    Adiciona tempo ao escudo de forma acumulativa.
+    Retorna o novo tempo final.
+    """
+    agora = pygame.time.get_ticks()
+
+    if tempo_fim_escudo > agora:
+        # Escudo já ativo → acumula
+        return tempo_fim_escudo + duracao_bonus
+    else:
+        # Escudo inativo → inicia novo
+        return agora + duracao_bonus
+
+
+def escudo_ativo(tempo_fim_escudo):
+    """
+    Retorna True se o escudo ainda estiver ativo.
+    """
+    return pygame.time.get_ticks() < tempo_fim_escudo
+
+
+def desenhar_barra_escudo(tela, tempo_fim_escudo, duracao_bonus, fonte):
+    """
+    Desenha barra de tempo restante + contador.
+    """
+    agora = pygame.time.get_ticks()
+    tempo_restante = max(0, tempo_fim_escudo - agora)
+
+    if tempo_restante <= 0:
+        return  # não desenha se não estiver ativo
+
+    proporcao = tempo_restante / duracao_bonus
+    proporcao = max(0, min(1, proporcao))
+
+    # Configurações visuais
+    largura_barra = 200
+    altura_barra = 20
+    x_barra = 580
+    y_barra = 20
+
+    # Fundo
+    pygame.draw.rect(tela, (80, 80, 80),
+                     (x_barra, y_barra, largura_barra, altura_barra))
+
+    # Barra azul
+    pygame.draw.rect(tela, (0, 200, 255),
+                     (x_barra, y_barra, largura_barra * proporcao, altura_barra))
+
+    # Texto em segundos
+    segundos = tempo_restante // 1000
+    texto = fonte.render(f"Escudo: {segundos}s", True, (255, 255, 255))
+    tela.blit(texto, (x_barra, y_barra + 25))
 
 def exibir_mensagem_bonus(tela):
     global mensagem_famoso, tempo_mensagem
