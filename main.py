@@ -1,10 +1,22 @@
+# main.py (corrigido)
 import pygame
 import random
 import os
+
 from player import Player
 from bonus import Bonus
-from utils import adicionar_tempo_escudo, desenhar_barra_escudo, escudo_ativo, exibir_pontuacao, desenhar_botao, alterar_som
 from obstacle import Obstacle
+from boss import Boss
+from projeteis import Projectile
+
+from utils import (
+    adicionar_tempo_escudo,
+    desenhar_barra_escudo,
+    escudo_ativo,
+    exibir_pontuacao,
+    desenhar_botao,
+    alterar_som
+)
 
 # -------------------------
 # Inicialização do Pygame
@@ -78,6 +90,13 @@ mensagem_famoso = False
 tempo_mensagem = 0
 som_morte_tocado = False
 
+# >>> LISTA DE PROJÉTEIS (deve existir fora do loop)
+projeteis = []
+
+# >>> Controle do boss (inicialmente desativado)
+boss_ativado = False
+boss = None
+
 tempo_fim_escudo = 0
 duracao_bonus = 5000  # 5 segundos por ferramenta
 
@@ -90,6 +109,8 @@ TELA_INICIAL = 0
 JOGANDO = 1
 GAME_OVER = 2
 CONFIG = 3
+CUTSCENE_BOSS = 4
+BOSS_ATAQUE = 5
 estado_jogo = TELA_INICIAL
 
 rodando = True
@@ -127,6 +148,10 @@ while rodando:
             velocidade_obstaculo = 6
             imune = False
             som_morte_tocado = False
+            # Reinicia boss/projéteis quando voltar ao menu principal
+            boss_ativado = False
+            boss = None
+            projeteis.clear()
 
         # Botão Configuração
         hover_config = (largura_tela//2 - 100 < mouse[0] < largura_tela//2 + 100) and (470 < mouse[1] < 520)
@@ -152,7 +177,6 @@ while rodando:
             tela.blit(fundo_jogo, (rel_x, 0))
         x_fundo -= velocidade_fundo
         velocidade_fundo += 0.001
-        print(f"Velocidade do fundo: {velocidade_fundo:.2f}")
 
         overlay = pygame.Surface((largura_tela, altura_tela))
         overlay.fill((50, 50, 50))
@@ -218,8 +242,7 @@ while rodando:
                 if b.tipo == "images/ferramenta_bonus.png":
                     imune = True
                     chamado = True
-                    tempo_fim_escudo = adicionar_tempo_escudo(tempo_fim_escudo,duracao_bonus)    
-                    
+                    tempo_fim_escudo = adicionar_tempo_escudo(tempo_fim_escudo, duracao_bonus)
                 elif b.tipo == "images/bebe_bonus.png":
                     pontuacao += 10
                     mensagem_famoso = True
@@ -227,19 +250,103 @@ while rodando:
                 elif b.tipo == "images/ppr_bonus.png":
                     pontuacao += 50
                     ppr = True
-                bonus.remove(b)  
+                bonus.remove(b)
 
-        if not escudo_ativo(tempo_fim_escudo):        
-                imune = False
+        if not escudo_ativo(tempo_fim_escudo):
+            imune = False
 
         if mensagem_famoso:
             mensagem = fonte.render("Você ficou famoso no Instagram!", True, (255, 255, 255))
             tela.blit(mensagem, (largura_tela//2 - mensagem.get_width()//2, 200))
             if pygame.time.get_ticks() - tempo_mensagem > 2000:
-                mensagem_famoso = False              
+                mensagem_famoso = False
 
         pontuacao += 1 / 60
         exibir_pontuacao(tela, int(pontuacao))
+
+        # -------------------------
+        # ATIVAR BOSS (trigger)
+        # -------------------------
+        # >>> Atenção: ajustei para 100 pontos no design. No seu teste você usa 10.
+        if pontuacao >= 10 and not boss_ativado:
+            boss = Boss(largura_tela, altura_tela)
+            boss_ativado = True
+            estado_jogo = CUTSCENE_BOSS
+
+    # -------------------------
+    # CUTSCENE BOSS
+    # -------------------------
+    elif estado_jogo == CUTSCENE_BOSS:
+        # Desenha ambiente (pode adicionar overlay se quiser)
+        tela.blit(fundo_jogo, (0, 0))
+
+        # Atualiza o boss (entrada / saída)
+        if boss:
+            boss.atualizar(largura_tela, altura_tela)
+            boss.desenhar(tela)
+
+            # Renderiza falas e avança o índice de fala internamente
+            boss.mostrar_falas(tela, fonte, pos=(largura_tela//2 - 150, 150))
+
+            # Quando o boss terminar de sair da tela (o próprio boss muda seu estado para ATACANDO),
+            # passamos para o estado de ataque (isso só ocorrerá após ele sair da tela)
+            if boss.estado == boss.ATACANDO:
+                # >>> chama iniciar_ataque para garantir que tempo_inicio_ataque está setado
+                boss.iniciar_ataque()
+                estado_jogo = BOSS_ATAQUE
+
+    # -------------------------
+    # BOSS ATAQUE
+    # -------------------------
+    elif estado_jogo == BOSS_ATAQUE:
+        
+        # >>> PLAYER VOLTA A TER CONTROLE
+
+        keys = pygame.key.get_pressed()
+
+        if keys[pygame.K_a]:
+            player.rect.x -= velocidade_player
+
+        if keys[pygame.K_d]:
+            player.rect.x += velocidade_player
+
+        if player.rect.left < 0:
+            player.rect.left = 0
+
+        if player.rect.right > largura_tela:
+            player.rect.right = largura_tela
+
+        for evento in eventos:
+            if evento.type == pygame.KEYDOWN and evento.key == pygame.K_SPACE:
+                player.pular()
+
+        player.atualizar()
+        player.desenhar()
+
+        # Spawn de projéteis do boss
+        if random.randint(0, 50) == 1:
+            projeteis.append(Projectile(largura_tela, altura_tela))
+
+        # Atualiza e desenha projéteis
+        for p in projeteis[:]:
+            p.mover()
+            p.desenhar(tela)
+
+            # Colisão com o player
+            if player.rect.colliderect(p.rect):
+                estado_jogo = GAME_OVER
+
+            # Remover projéteis que saem da tela
+            if p.x < -100:
+                try:
+                    projeteis.remove(p)
+                except ValueError:
+                    pass
+
+        # Boss cansa após 60 segundos (60000 ms)
+        if boss and (pygame.time.get_ticks() - boss.tempo_inicio_ataque > 60000):
+            projeteis.clear()
+            estado_jogo = JOGANDO
 
     # -------------------------
     # GAME OVER
@@ -254,23 +361,18 @@ while rodando:
         fundo_cinza.blit(overlay, (0, 0))
         tela.blit(fundo_cinza, (0, 0))
 
-        # Player PB
+        # Player PB (dessaturado)
         player_img = player.image.copy()
-
-        # Criar superfície cinza
         cinza_overlay = pygame.Surface(player_img.get_size())
-        cinza_overlay.fill((180, 180, 180))  # intensidade do cinza
-
-        # Aplicar efeito multiplicação
+        cinza_overlay.fill((180, 180, 180))
         player_img.blit(cinza_overlay, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
-        player_img.set_alpha(180)  # intensidade do efeito
+        player_img.set_alpha(180)
         tela.blit(player_img, player.rect.topleft)
 
-        fonte_game_over = pygame.font.Font(None, 108)  # 72 é o tamanho da fonte
+        fonte_game_over = pygame.font.Font(None, 108)
         game_over_texto = fonte_game_over.render("Goiabinha faleceu!", True, vermelho)
         tela.blit(game_over_texto, (largura_tela//2 - game_over_texto.get_width()//2, 200))
 
-        # Botão Reiniciar
         hover_reiniciar = (largura_tela//2 - 100 < mouse[0] < largura_tela//2 + 100) and (300 < mouse[1] < 350)
         if hover_reiniciar and not getattr(desenhar_botao, "ja_hover_reiniciar", False):
             som_botao.play()
