@@ -286,13 +286,12 @@ while rodando:
             boss.desenhar(tela)
 
             # Renderiza falas e avança o índice de fala internamente
-            boss.mostrar_falas(tela, fonte, pos=(largura_tela//2 - 150, 150))
+            boss.mostrar_falas(tela, fonte)
 
             # Quando o boss terminar de sair da tela (o próprio boss muda seu estado para ATACANDO),
             # passamos para o estado de ataque (isso só ocorrerá após ele sair da tela)
             if boss.estado == boss.ATACANDO:
                 # >>> chama iniciar_ataque para garantir que tempo_inicio_ataque está setado
-                boss.iniciar_ataque()
                 estado_jogo = BOSS_ATAQUE
 
     # -------------------------

@@ -12,7 +12,7 @@ class Boss:
         self.width = 500
         self.height = 500
 
-        altura_chao = 80  # mesma margem usada para o player
+        altura_chao = 10  # mesma margem usada para o player
 
         # Posição inicial (fora da tela, à direita)
         self.x = largura_tela
@@ -89,7 +89,7 @@ class Boss:
         """
         tela.blit(self.imagem, (int(self.x), int(self.y)))
 
-    def mostrar_falas(self, tela, fonte, pos=(50, 30), cor=(255,50,50)):
+    def mostrar_falas(self, tela, fonte, cor=(255,50,50)):
         """
         Desenha a fala atual na tela e avança as falas de acordo com o tempo.
         Quando terminar as falas, altera o estado para SAINDO.
@@ -102,8 +102,14 @@ class Boss:
             return False
 
         # Renderiza a fala atual
+
         texto = fonte.render(self.falas[self.indice_fala], True, cor)
-        tela.blit(texto, pos)
+
+        # >>> centraliza no topo da tela
+        x = tela.get_width() // 2 - texto.get_width() // 2
+        y = 20
+
+        tela.blit(texto, (x, y))
 
         # Avança a fala quando passar o tempo
         if agora - self.tempo_fala > self.delay_entre_falas:
