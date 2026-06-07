@@ -101,13 +101,15 @@ python main.py
 
 ## 👨‍💻 Autor
 
-Desenvolvido por Vinicius M. Lago
+### Desenvolvido e escrito por Vinicius M. Lago
 
 GitHub:
 https://github.com/ViniciusMLago
 
-Design artístico e musical
+### Artes e música por Matheus Lima do Nascimento
 
-Matheus Lima do Nascimento
+GitHub:
+https://github.com/printaQueFunciona
+
 ---
 #### ⭐ Se você gostou do projeto, deixe uma estrela no repositório!
