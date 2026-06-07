@@ -4,8 +4,10 @@ import random
 import pygame
 
 from bonus import Bonus
+from boss import Boss
 from obstacle import Obstacle
 from player import Player
+from projeteis import Projectile
 from utils import (
     adicionar_tempo_escudo,
     alterar_som,
@@ -88,6 +90,10 @@ INTERVALO_OBSTACULO_INICIAL = 1500
 INTERVALO_OBSTACULO_MIN = 700
 DURACAO_BONUS = 5000
 DURACAO_MENSAGEM = 2000
+PONTOS_BOSS = 150
+DURACAO_ATAQUE_BOSS = 8000
+TEMPO_MINIMO_REAPARECIMENTO = 20000
+TEMPO_MAXIMO_REAPARECIMENTO = 60000
 
 # -------------------------
 # Estados do jogo
@@ -111,6 +117,12 @@ def resetar_jogo():
         "escudo_img": escudo,
         "bonus": pygame.sprite.Group(),
         "obstaculos": pygame.sprite.Group(),
+        "projecteis": pygame.sprite.Group(),
+        "boss": None,
+        "boss_ataque_inicio": 0,
+        "boss_ultimo_tiro": 0,
+        "boss_proximo_tiro": 0,
+        "boss_cooldown": 0,
         "pontuacao": 0.0,
         "velocidade_obstaculo": VELOCIDADE_OBSTACULO_INICIAL,
         "intervalo_obstaculo": INTERVALO_OBSTACULO_INICIAL,
@@ -176,6 +188,20 @@ def spawn_bonus(estado):
     estado["ultimo_tempo_bonus"] = tempo_atual
 
 
+def spawn_boss(estado):
+    agora = pygame.time.get_ticks()
+    if estado["boss"] is not None:
+        return
+    if estado["pontuacao"] < PONTOS_BOSS or agora < estado["boss_cooldown"]:
+        return
+
+    estado["boss"] = Boss(LARGURA_TELA, ALTURA_TELA)
+    estado["boss_ataque_inicio"] = 0
+    estado["boss_ultimo_tiro"] = agora
+    estado["boss_proximo_tiro"] = agora + random.randint(250, 600)
+    mostrar_mensagem(estado, "Boss apareceu! Prepare-se!")
+
+
 def processar_bonus(estado):
     for b in list(estado["bonus"]):
         b.mover()
@@ -230,9 +256,6 @@ while rodando:
     if estado_jogo == TELA_INICIAL:
         tela.blit(fundo_inicial, (0, 0))
 
-        titulo = fonte_grande.render("Jogo da Goiabinha", True, PRETO)
-        tela.blit(titulo, (LARGURA_TELA // 2 - titulo.get_width() // 2, 120))
-
         if recorde > 0:
             rec_texto = fonte.render(f"Recorde: {recorde}", True, (255, 215, 0))
             tela.blit(rec_texto, (LARGURA_TELA // 2 - rec_texto.get_width() // 2, 200))
@@ -280,7 +303,48 @@ while rodando:
             shield_rect = jogo["escudo_img"].get_rect(center=jogo["player"].rect.center)
             tela.blit(jogo["escudo_img"], shield_rect)
 
-        spawn_obstaculo(jogo)
+        if jogo["boss"] is None:
+            spawn_obstaculo(jogo)
+        spawn_boss(jogo)
+
+        if jogo["boss"] is not None:
+            agora = pygame.time.get_ticks()
+            jogo["boss"].atualizar(LARGURA_TELA, ALTURA_TELA)
+            jogo["boss"].desenhar(tela)
+            jogo["boss"].mostrar_falas(tela, fonte_mensagem)
+
+            if jogo["boss_ataque_inicio"] and agora - jogo["boss_ataque_inicio"] >= DURACAO_ATAQUE_BOSS:
+                jogo["boss"] = None
+                jogo["boss_ataque_inicio"] = 0
+                jogo["boss_cooldown"] = agora + random.randint(TEMPO_MINIMO_REAPARECIMENTO, TEMPO_MAXIMO_REAPARECIMENTO)
+                jogo["projecteis"].empty()
+                jogo["boss_proximo_tiro"] = 0
+                mostrar_mensagem(jogo, "O boss vai voltar novamente...")
+            elif jogo["boss"].estado == jogo["boss"].ATACANDO:
+                if jogo["boss_ataque_inicio"] == 0:
+                    jogo["boss_ataque_inicio"] = jogo["boss"].tempo_inicio_ataque or agora
+                    jogo["boss_ultimo_tiro"] = agora
+                    jogo["boss_proximo_tiro"] = agora + random.randint(180, 520)
+
+                if agora >= jogo["boss_proximo_tiro"]:
+                    jogo["projecteis"].add(Projectile.criar_aleatorio(LARGURA_TELA, ALTURA_TELA))
+                    jogo["boss_ultimo_tiro"] = agora
+                    jogo["boss_proximo_tiro"] = agora + random.randint(220, 700)
+
+                for proj in list(jogo["projecteis"]):
+                    proj.mover()
+                    proj.desenhar(tela)
+                    if proj.rect.colliderect(jogo["player"].rect) and not jogo["imune"]:
+                        estado_jogo = GAME_OVER
+                        recorde = salvar_recorde(int(jogo["pontuacao"]))
+                        pygame.mixer.music.stop()
+                        if not jogo["som_morte_tocado"]:
+                            som_morte.play()
+                            jogo["som_morte_tocado"] = True
+                        break
+                    if proj.fora_da_tela():
+                        jogo["projecteis"].remove(proj)
+
         for obstaculo in list(jogo["obstaculos"]):
             obstaculo.mover()
             obstaculo.desenhar()
