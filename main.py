@@ -1,10 +1,22 @@
-import pygame
-import random
 import os
-from player import Player
+import random
+
+import pygame
+
 from bonus import Bonus
-from utils import adicionar_tempo_escudo, desenhar_barra_escudo, escudo_ativo, exibir_pontuacao, desenhar_botao, alterar_som
 from obstacle import Obstacle
+from player import Player
+from utils import (
+    adicionar_tempo_escudo,
+    alterar_som,
+    carregar_recorde,
+    desenhar_barra_escudo,
+    desenhar_botao,
+    escudo_ativo,
+    exibir_mensagem_temporaria,
+    exibir_pontuacao,
+    salvar_recorde,
+)
 
 # -------------------------
 # Inicialização do Pygame
@@ -13,17 +25,16 @@ pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
 pygame.init()
 pygame.mixer.init()
 
-# -------------------------
-# Diretório de trabalho
-# -------------------------
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # -------------------------
 # Configuração da tela
 # -------------------------
-largura_tela = 800
-altura_tela = 600
-tela = pygame.display.set_mode((largura_tela, altura_tela))
+LARGURA_TELA = 800
+ALTURA_TELA = 600
+FPS = 60
+
+tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
 pygame.display.set_caption("Jogo da Goiabinha")
 
 # -------------------------
@@ -32,56 +43,51 @@ pygame.display.set_caption("Jogo da Goiabinha")
 som_botao = pygame.mixer.Sound(os.path.join(os.getcwd(), "sounds/botao_inicial.wav"))
 som_morte = pygame.mixer.Sound(os.path.join(os.getcwd(), "sounds/Sad Violin.mp3"))
 
-# Música de fundo
 pygame.mixer.music.load(os.path.join(os.getcwd(), "sounds/musica.mp3"))
-volume_atual = float(0.5)
+volume_atual = 0.5
 pygame.mixer.music.set_volume(volume_atual)
 pygame.mixer.music.play(-1)
 
 # -------------------------
-# Imagens de fundo
+# Imagens
 # -------------------------
 fundo_jogo = pygame.image.load("images/Background.jpg").convert()
-fundo_jogo = pygame.transform.scale(fundo_jogo, (largura_tela, altura_tela))
+fundo_jogo = pygame.transform.scale(fundo_jogo, (LARGURA_TELA, ALTURA_TELA))
 fundo_inicial = pygame.image.load("images/Background_TelaInicial.png").convert()
-fundo_inicial = pygame.transform.scale(fundo_inicial, (largura_tela, altura_tela))
+fundo_inicial = pygame.transform.scale(fundo_inicial, (LARGURA_TELA, ALTURA_TELA))
 
-x_fundo = 0
-velocidade_fundo = 2
+escudo_img = pygame.image.load("images/shield_force.png").convert_alpha()
+escudo_img = pygame.transform.scale(escudo_img, (120, 120))
+escudo_img.set_alpha(100)
+
+overlay_jogo = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
+overlay_jogo.fill((50, 50, 50))
+overlay_jogo.set_alpha(60)
 
 # -------------------------
-# Cores e FPS
+# Cores, fontes e clock
 # -------------------------
-vermelho = (255, 0, 0)
-preto = (0, 0, 0)
-cinza = (200, 200, 200)
+VERMELHO = (255, 0, 0)
+PRETO = (0, 0, 0)
+CINZA = (200, 200, 200)
 clock = pygame.time.Clock()
 
-# -------------------------
-# Variáveis do jogo
-# -------------------------
-velocidade_player = 5
-player = Player(tela, largura_tela, altura_tela)
-bonus = pygame.sprite.Group()
-obstaculos = pygame.sprite.Group()
-pontuacao = 0
-velocidade_obstaculo = 6
-ultimo_tempo_obstaculo = 0
-intervalo_minimo = 1000
-imune = False
-ppr = False
-chamado = False
-tempo_escudo = 0
-tempo_fim_escudo = 0
-duracao_escudo = 5000
-mensagem_famoso = False
-tempo_mensagem = 0
-som_morte_tocado = False
-
-tempo_fim_escudo = 0
-duracao_bonus = 5000  # 5 segundos por ferramenta
-
 fonte = pygame.font.Font(None, 36)
+fonte_grande = pygame.font.Font(None, 108)
+fonte_mensagem = pygame.font.Font(None, 42)
+
+# -------------------------
+# Constantes de gameplay
+# -------------------------
+VELOCIDADE_PLAYER = 5
+VELOCIDADE_FUNDO_INICIAL = 2
+VELOCIDADE_FUNDO_MAX = 8
+VELOCIDADE_OBSTACULO_INICIAL = 6
+VELOCIDADE_OBSTACULO_MAX = 14
+INTERVALO_OBSTACULO_INICIAL = 1500
+INTERVALO_OBSTACULO_MIN = 700
+DURACAO_BONUS = 5000
+DURACAO_MENSAGEM = 2000
 
 # -------------------------
 # Estados do jogo
@@ -90,7 +96,127 @@ TELA_INICIAL = 0
 JOGANDO = 1
 GAME_OVER = 2
 CONFIG = 3
+
+
+def resetar_jogo():
+    player = Player(tela, LARGURA_TELA, ALTURA_TELA)
+    escudo = pygame.transform.scale(
+        escudo_img,
+        (player.image.get_width() + 50, player.image.get_height() + 50),
+    )
+    escudo.set_alpha(100)
+
+    return {
+        "player": player,
+        "escudo_img": escudo,
+        "bonus": pygame.sprite.Group(),
+        "obstaculos": pygame.sprite.Group(),
+        "pontuacao": 0.0,
+        "velocidade_obstaculo": VELOCIDADE_OBSTACULO_INICIAL,
+        "intervalo_obstaculo": INTERVALO_OBSTACULO_INICIAL,
+        "ultimo_tempo_obstaculo": pygame.time.get_ticks(),
+        "ultimo_tempo_bonus": pygame.time.get_ticks(),
+        "imune": False,
+        "tempo_fim_escudo": 0,
+        "duracao_total_escudo": 0,
+        "mensagem": "",
+        "tempo_fim_mensagem": 0,
+        "x_fundo": 0,
+        "velocidade_fundo": VELOCIDADE_FUNDO_INICIAL,
+        "som_morte_tocado": False,
+    }
+
+
+def mostrar_mensagem(estado, texto):
+    estado["mensagem"] = texto
+    estado["tempo_fim_mensagem"] = pygame.time.get_ticks() + DURACAO_MENSAGEM
+
+
+def desenhar_fundo_parallax(estado):
+    rel_x = estado["x_fundo"] % fundo_jogo.get_width()
+    tela.blit(fundo_jogo, (rel_x - fundo_jogo.get_width(), 0))
+    if rel_x < LARGURA_TELA:
+        tela.blit(fundo_jogo, (rel_x, 0))
+    estado["x_fundo"] -= estado["velocidade_fundo"]
+    estado["velocidade_fundo"] = min(
+        estado["velocidade_fundo"] + 0.001,
+        VELOCIDADE_FUNDO_MAX,
+    )
+
+
+def spawn_obstaculo(estado):
+    tempo_atual = pygame.time.get_ticks()
+    if tempo_atual - estado["ultimo_tempo_obstaculo"] < estado["intervalo_obstaculo"]:
+        return
+
+    tipo_obstaculo = random.randint(1, 4)
+    estado["obstaculos"].add(
+        Obstacle(tela, LARGURA_TELA, ALTURA_TELA, tipo_obstaculo, estado["velocidade_obstaculo"])
+    )
+    estado["ultimo_tempo_obstaculo"] = tempo_atual
+    estado["velocidade_obstaculo"] = min(
+        estado["velocidade_obstaculo"] + 0.05,
+        VELOCIDADE_OBSTACULO_MAX,
+    )
+    estado["intervalo_obstaculo"] = max(
+        INTERVALO_OBSTACULO_MIN,
+        estado["intervalo_obstaculo"] - 15,
+    )
+
+
+def spawn_bonus(estado):
+    tempo_atual = pygame.time.get_ticks()
+    if tempo_atual - estado["ultimo_tempo_bonus"] < 3000:
+        return
+    if random.randint(1, 100) > 8:
+        return
+
+    velocidade_bonus = min(estado["velocidade_obstaculo"], VELOCIDADE_OBSTACULO_MAX)
+    estado["bonus"].add(Bonus(tela, LARGURA_TELA, ALTURA_TELA, velocidade_bonus))
+    estado["ultimo_tempo_bonus"] = tempo_atual
+
+
+def processar_bonus(estado):
+    for b in list(estado["bonus"]):
+        b.mover()
+        b.desenhar()
+
+        if b.fora_da_tela():
+            estado["bonus"].remove(b)
+            continue
+
+        if not estado["player"].rect.colliderect(b.rect):
+            continue
+
+        if b.tipo == "images/ferramenta_bonus.png":
+            estado["imune"] = True
+            estado["tempo_fim_escudo"], estado["duracao_total_escudo"] = adicionar_tempo_escudo(
+                estado["tempo_fim_escudo"],
+                DURACAO_BONUS,
+            )
+            mostrar_mensagem(estado, "Escudo ativado!")
+        elif b.tipo == "images/bebe_bonus.png":
+            estado["pontuacao"] += 10
+            mostrar_mensagem(estado, "Você ficou famoso no Instagram!")
+        elif b.tipo == "images/ppr_bonus.png":
+            estado["pontuacao"] += 50
+            mostrar_mensagem(estado, "PPR coletado! +50 pontos!")
+
+        estado["bonus"].remove(b)
+
+
+def tocar_som_hover(flag_attr, hover, som):
+    if hover and not getattr(desenhar_botao, flag_attr, False):
+        som.play()
+    setattr(desenhar_botao, flag_attr, hover)
+
+
+# -------------------------
+# Estado inicial
+# -------------------------
+recorde = carregar_recorde()
 estado_jogo = TELA_INICIAL
+jogo = resetar_jogo()
 
 rodando = True
 while rodando:
@@ -101,188 +227,118 @@ while rodando:
 
     mouse = pygame.mouse.get_pos()
 
-    # -------------------------
-    # TELA INICIAL
-    # -------------------------
     if estado_jogo == TELA_INICIAL:
         tela.blit(fundo_inicial, (0, 0))
 
-        # Botão Iniciar
-        hover_start = (largura_tela//2 - 100 < mouse[0] < largura_tela//2 + 100) and (400 < mouse[1] < 450)
-        if hover_start and not getattr(desenhar_botao, "ja_hover_start", False):
-            som_botao.play()
-        desenhar_botao.ja_hover_start = hover_start
-        if desenhar_botao(tela, "Iniciar Jogo", largura_tela//2 - 100, 400, 200, 50, cinza, preto, eventos):
-            estado_jogo = JOGANDO
-            player = Player(tela, largura_tela, altura_tela)
-            escudo_img = pygame.image.load("images/shield_force.png").convert_alpha()
-            escudo_img = pygame.transform.scale(
-                escudo_img,
-                (player.image.get_width() + 50, player.image.get_height() + 50)
-            )
-            escudo_img.set_alpha(100)
-            bonus.empty()
-            obstaculos.empty()
-            pontuacao = 0
-            velocidade_obstaculo = 6
-            imune = False
-            som_morte_tocado = False
+        titulo = fonte_grande.render("Jogo da Goiabinha", True, PRETO)
+        tela.blit(titulo, (LARGURA_TELA // 2 - titulo.get_width() // 2, 120))
 
-        # Botão Configuração
-        hover_config = (largura_tela//2 - 100 < mouse[0] < largura_tela//2 + 100) and (470 < mouse[1] < 520)
-        if hover_config and not getattr(desenhar_botao, "ja_hover_config", False):
-            som_botao.play()
-        desenhar_botao.ja_hover_config = hover_config
-        if desenhar_botao(tela, "Configuração", largura_tela//2 - 100, 470, 200, 50, cinza, preto, eventos):
+        if recorde > 0:
+            rec_texto = fonte.render(f"Recorde: {recorde}", True, (255, 215, 0))
+            tela.blit(rec_texto, (LARGURA_TELA // 2 - rec_texto.get_width() // 2, 200))
+
+        controles = fonte.render("A/D mover  |  Espaço pular (duplo)", True, PRETO)
+        tela.blit(controles, (LARGURA_TELA // 2 - controles.get_width() // 2, 360))
+
+        tocar_som_hover("ja_hover_start", (LARGURA_TELA // 2 - 100 < mouse[0] < LARGURA_TELA // 2 + 100) and (400 < mouse[1] < 450), som_botao)
+        if desenhar_botao(tela, "Iniciar Jogo", LARGURA_TELA // 2 - 100, 400, 200, 50, CINZA, PRETO, eventos, fonte):
+            estado_jogo = JOGANDO
+            jogo = resetar_jogo()
+
+        tocar_som_hover("ja_hover_config", (LARGURA_TELA // 2 - 100 < mouse[0] < LARGURA_TELA // 2 + 100) and (470 < mouse[1] < 520), som_botao)
+        if desenhar_botao(tela, "Configuração", LARGURA_TELA // 2 - 100, 470, 200, 50, CINZA, PRETO, eventos, fonte):
             estado_jogo = CONFIG
 
-    # -------------------------
-    # CONFIGURAÇÃO (POP-UP)
-    # -------------------------
     elif estado_jogo == CONFIG:
-        volume_atual, estado_jogo = alterar_som(tela, fundo_inicial, fonte, largura_tela, mouse, som_botao, cinza, preto, eventos, estado_jogo, TELA_INICIAL, volume_atual)
+        volume_atual, estado_jogo = alterar_som(
+            tela, fundo_inicial, fonte, LARGURA_TELA, mouse, som_botao, CINZA, PRETO,
+            eventos, estado_jogo, TELA_INICIAL, volume_atual,
+        )
 
-    # -------------------------
-    # JOGO
-    # -------------------------
     elif estado_jogo == JOGANDO:
-        rel_x = x_fundo % fundo_jogo.get_width()
-        tela.blit(fundo_jogo, (rel_x - fundo_jogo.get_width(), 0))
-        if rel_x < largura_tela:
-            tela.blit(fundo_jogo, (rel_x, 0))
-        x_fundo -= velocidade_fundo
-        velocidade_fundo += 0.001
-        print(f"Velocidade do fundo: {velocidade_fundo:.2f}")
-
-        overlay = pygame.Surface((largura_tela, altura_tela))
-        overlay.fill((50, 50, 50))
-        overlay.set_alpha(60)
-        tela.blit(overlay, (0, 0))
+        desenhar_fundo_parallax(jogo)
+        tela.blit(overlay_jogo, (0, 0))
 
         keys = pygame.key.get_pressed()
         if keys[pygame.K_a]:
-            player.rect.x -= velocidade_player
+            jogo["player"].rect.x -= VELOCIDADE_PLAYER
         if keys[pygame.K_d]:
-            player.rect.x += velocidade_player
-        if player.rect.left < 0:
-            player.rect.left = 0
-        if player.rect.right > largura_tela:
-            player.rect.right = largura_tela
+            jogo["player"].rect.x += VELOCIDADE_PLAYER
+        jogo["player"].rect.left = max(0, jogo["player"].rect.left)
+        jogo["player"].rect.right = min(LARGURA_TELA, jogo["player"].rect.right)
 
         for evento in eventos:
             if evento.type == pygame.KEYDOWN and evento.key == pygame.K_SPACE:
-                player.pular()
+                jogo["player"].pular()
 
-        player.atualizar()
-        player.desenhar()
+        jogo["player"].atualizar()
+        jogo["player"].desenhar()
 
-        desenhar_barra_escudo(
-            tela,
-            tempo_fim_escudo,
-            duracao_bonus,
-            fonte
-        )
+        desenhar_barra_escudo(tela, jogo["tempo_fim_escudo"], jogo["duracao_total_escudo"], fonte)
 
-        if imune:
-            shield_rect = escudo_img.get_rect(center=player.rect.center)
-            tela.blit(escudo_img, shield_rect)
+        if jogo["imune"]:
+            shield_rect = jogo["escudo_img"].get_rect(center=jogo["player"].rect.center)
+            tela.blit(jogo["escudo_img"], shield_rect)
 
-        # Obstáculos
-        tempo_atual = pygame.time.get_ticks()
-        if tempo_atual - ultimo_tempo_obstaculo > intervalo_minimo and random.randint(1, 100) == 1:
-            tipo_obstaculo = random.randint(1, 4)
-            obstaculos.add(Obstacle(tela, largura_tela, altura_tela, tipo_obstaculo, velocidade_obstaculo))
-            ultimo_tempo_obstaculo = tempo_atual
-            velocidade_obstaculo += 0.05  # Aumenta a velocidade dos obstáculos a cada geração
-
-        for obstaculo in list(obstaculos):
+        spawn_obstaculo(jogo)
+        for obstaculo in list(jogo["obstaculos"]):
             obstaculo.mover()
             obstaculo.desenhar()
-            if player.rect.colliderect(obstaculo.rect) and not imune:
+            if jogo["player"].rect.colliderect(obstaculo.rect) and not jogo["imune"]:
                 estado_jogo = GAME_OVER
+                recorde = salvar_recorde(int(jogo["pontuacao"]))
                 pygame.mixer.music.stop()
-                if not som_morte_tocado:
+                if not jogo["som_morte_tocado"]:
                     som_morte.play()
-                    som_morte_tocado = True
-            if obstaculo.rect.right < 0:
-                obstaculos.remove(obstaculo)
+                    jogo["som_morte_tocado"] = True
+            if obstaculo.fora_da_tela():
+                jogo["obstaculos"].remove(obstaculo)
 
-        # Bônus
-        if random.randint(1, 400) == 1:
-            bonus.add(Bonus(tela, largura_tela, altura_tela))
+        spawn_bonus(jogo)
+        processar_bonus(jogo)
 
-        for b in list(bonus):
-            b.mover()
-            b.desenhar()
-            if player.rect.colliderect(b.rect):
-                if b.tipo == "images/ferramenta_bonus.png":
-                    imune = True
-                    chamado = True
-                    tempo_fim_escudo = adicionar_tempo_escudo(tempo_fim_escudo,duracao_bonus)    
-                    
-                elif b.tipo == "images/bebe_bonus.png":
-                    pontuacao += 10
-                    mensagem_famoso = True
-                    tempo_mensagem = pygame.time.get_ticks()
-                elif b.tipo == "images/ppr_bonus.png":
-                    pontuacao += 50
-                    ppr = True
-                bonus.remove(b)  
+        if not escudo_ativo(jogo["tempo_fim_escudo"]):
+            jogo["imune"] = False
+            jogo["duracao_total_escudo"] = 0
 
-        if not escudo_ativo(tempo_fim_escudo):        
-                imune = False
+        exibir_mensagem_temporaria(tela, jogo["mensagem"], fonte_mensagem, jogo["tempo_fim_mensagem"])
 
-        if mensagem_famoso:
-            mensagem = fonte.render("Você ficou famoso no Instagram!", True, (255, 255, 255))
-            tela.blit(mensagem, (largura_tela//2 - mensagem.get_width()//2, 200))
-            if pygame.time.get_ticks() - tempo_mensagem > 2000:
-                mensagem_famoso = False              
+        jogo["pontuacao"] += 1 / FPS
+        exibir_pontuacao(tela, int(jogo["pontuacao"]), fonte, recorde)
 
-        pontuacao += 1 / 60
-        exibir_pontuacao(tela, int(pontuacao))
-
-    # -------------------------
-    # GAME OVER
-    # -------------------------
     elif estado_jogo == GAME_OVER:
-        # Fundo PB
         fundo_cinza = fundo_jogo.copy()
-        overlay = pygame.Surface((largura_tela, altura_tela))
-        overlay.fill((100, 100, 100))  # tom de cinza
-        overlay.set_alpha(150)  # intensidade do efeito
-
+        overlay = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
+        overlay.fill((100, 100, 100))
+        overlay.set_alpha(150)
         fundo_cinza.blit(overlay, (0, 0))
         tela.blit(fundo_cinza, (0, 0))
 
-        # Player PB
-        player_img = player.image.copy()
-
-        # Criar superfície cinza
+        player_img = jogo["player"].image.copy()
         cinza_overlay = pygame.Surface(player_img.get_size())
-        cinza_overlay.fill((180, 180, 180))  # intensidade do cinza
-
-        # Aplicar efeito multiplicação
+        cinza_overlay.fill((180, 180, 180))
         player_img.blit(cinza_overlay, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
-        player_img.set_alpha(180)  # intensidade do efeito
-        tela.blit(player_img, player.rect.topleft)
+        player_img.set_alpha(180)
+        tela.blit(player_img, jogo["player"].rect.topleft)
 
-        fonte_game_over = pygame.font.Font(None, 108)  # 72 é o tamanho da fonte
-        game_over_texto = fonte_game_over.render("Goiabinha faleceu!", True, vermelho)
-        tela.blit(game_over_texto, (largura_tela//2 - game_over_texto.get_width()//2, 200))
+        game_over_texto = fonte_grande.render("Goiabinha faleceu!", True, VERMELHO)
+        tela.blit(game_over_texto, (LARGURA_TELA // 2 - game_over_texto.get_width() // 2, 160))
 
-        # Botão Reiniciar
-        hover_reiniciar = (largura_tela//2 - 100 < mouse[0] < largura_tela//2 + 100) and (300 < mouse[1] < 350)
-        if hover_reiniciar and not getattr(desenhar_botao, "ja_hover_reiniciar", False):
-            som_botao.play()
-        desenhar_botao.ja_hover_reiniciar = hover_reiniciar
-        if desenhar_botao(tela, "Reiniciar", largura_tela//2 - 100, 300, 200, 50, cinza, preto, eventos):
+        score_final = fonte.render(f"Pontuação: {int(jogo['pontuacao'])}", True, (255, 255, 255))
+        tela.blit(score_final, (LARGURA_TELA // 2 - score_final.get_width() // 2, 260))
+
+        rec_final = fonte.render(f"Recorde: {recorde}", True, (255, 215, 0))
+        tela.blit(rec_final, (LARGURA_TELA // 2 - rec_final.get_width() // 2, 300))
+
+        tocar_som_hover("ja_hover_reiniciar", (LARGURA_TELA // 2 - 100 < mouse[0] < LARGURA_TELA // 2 + 100) and (360 < mouse[1] < 410), som_botao)
+        if desenhar_botao(tela, "Reiniciar", LARGURA_TELA // 2 - 100, 360, 200, 50, CINZA, PRETO, eventos, fonte):
             estado_jogo = TELA_INICIAL
             som_morte.stop()
-            som_morte_tocado = False
+            jogo["som_morte_tocado"] = False
             pygame.mixer.music.play(-1)
             pygame.mixer.music.set_volume(volume_atual)
 
     pygame.display.update()
-    clock.tick(60)
+    clock.tick(FPS)
 
 pygame.quit()
