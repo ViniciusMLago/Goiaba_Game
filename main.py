@@ -1,7 +1,16 @@
 import os
 import random
+import sys
 
-import pygame
+try:
+    import pygame
+except ModuleNotFoundError:
+    sys.stderr.write(
+        "Erro: o módulo 'pygame' não está instalado.\n"
+        "Use: py -3.11 -m pip install -r requirements.txt\n"
+        "Depois execute: py -3.11 main.py\n"
+    )
+    raise SystemExit(1)
 
 from bonus import Bonus
 from boss import Boss
