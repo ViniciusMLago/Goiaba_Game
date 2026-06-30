@@ -40,7 +40,9 @@ Desktop.ini
 # ==========================
 # Build / Distribuição
 # ==========================
-build/
+build/*
+!build/web/
+!build/web/**
 dist/
 *.spec
 
